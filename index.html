@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="한 판만 더">
 <meta name="theme-color" content="#0c0e12">
 <meta property="og:title" content="한 판만 더!">
 <meta property="og:image" content="https://mind031.github.io/hanpanmande/img/og.jpg">
@@ -89,6 +96,7 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--gold);outline-o
 .olBtn{border-radius:var(--r-md);padding:14px;cursor:pointer;display:flex;flex-direction:column;gap:4px;text-align:left;min-height:78px;
   background:var(--glass);border:1px solid var(--stroke);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
 .olBtn:hover{background:var(--glass-2)}
+.instBtn{min-height:0;flex-direction:row;align-items:baseline;justify-content:center;gap:10px;text-align:center}
 .olBtn b{font-size:17px}
 .olBtn span{font-size:12px;color:var(--muted)}
 .opts{display:flex;flex-direction:column;gap:14px}
@@ -161,6 +169,10 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--gold);outline-o
 .msg{align-self:center;text-align:center;font-size:14px;font-weight:500;min-height:20px;color:var(--muted);padding:4px 14px;border-radius:999px}
 .msg:has(b){background:rgba(95,211,166,.16);color:var(--ink)}
 .msg b{color:var(--mint)}
+/* 남은 시간 */
+.msgRow{display:flex;justify-content:center;align-items:center;gap:8px;min-height:28px}
+.tick{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;padding:4px 10px;border-radius:999px;background:var(--glass-2);color:var(--ink)}
+.tick.warn{background:var(--accent);color:#fff;animation:pulse 1s infinite}
 .myav{width:30px;flex:none;border-radius:50%}
 
 .hand{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding-top:4px}
@@ -247,6 +259,7 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--gold);outline-o
       <button class="seg" type="button" data-snd="1">켜기</button>
       <button class="seg" type="button" data-snd="0">끄기</button></div>
   </section>
+  <button class="olBtn instBtn" id="installBtn" type="button" hidden><b>홈 화면에 추가</b><span>바탕화면 아이콘으로 바로 열기</span></button>
   <p class="record">가상 머니는 게임 속 돈이에요. 5만 냥 밑으로 내려가면 매일 한 번 5만 냥까지 채워져요.</p>
 </main>
 
@@ -274,7 +287,7 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--gold);outline-o
     <div class="field" id="field"></div>
   </section>
 
-  <div class="msg" id="msg"></div>
+  <div class="msgRow"><div class="msg" id="msg"></div><span class="tick" id="tick" hidden></span></div>
 
   <section class="side">
     <div class="caps" id="myCaps"></div>
@@ -550,13 +563,18 @@ function newGame(){
 
 /* ---------- 온라인 대전 (깃허브 사이트에서만, PeerJS로 기기끼리 직접 연결) ---------- */
 // 방장(host)이 게임을 돌리고, 손님(guest)은 화면을 받아 그리고 자기 행동만 보냄
-const NET={role:null,conn:null,peer:null,opp:null,carry:1,starter:null,waiters:{},againMe:false,againOpp:false,timer:null};
+const NET={role:null,conn:null,peer:null,opp:null,carry:1,starter:null,waiters:{},againMe:false,againOpp:false,timer:null,token:null,oppToken:null,hostId:null,lost:false,pendingAsk:null,lastResult:null,myTimer:null};
+const TURN_MS=15000;
 const ONLINE_OK=typeof Peer!=='undefined'&&!/claude/.test(location.hostname);
 const GAME_SFX=new Set(['tap','hit','take','flip','deal']);
 const online=()=>!!NET.role;
 function netSend(o){ try{ if(NET.conn&&NET.conn.open) NET.conn.send(o); }catch(e){} }
 function netWait(type){ return new Promise(r=>{ NET.waiters[type]=r; }); }
-function myProfile(){ const p=store.profile||{name:'나',av:0}; return {name:p.name,av:p.av,money:store.money}; }
+function myProfile(){ const p=store.profile||{name:'나',av:0}; if(!NET.token) NET.token=Math.random().toString(36).slice(2)+Date.now().toString(36); return {name:p.name,av:p.av,money:store.money,token:NET.token}; }
+/* 일정 시간 안에 답이 없으면 null */
+function netWaitFor(type,ms){ return new Promise(r=>{ let done=false; NET.waiters[type]=o=>{ if(done) return; done=true; clearTimeout(t); r(o); }; const t=setTimeout(()=>{ if(done) return; done=true; if(NET.waiters[type]) delete NET.waiters[type]; r(null); },Math.max(0,ms)); }); }
+function autoCard(p){ const h=S.hands[p]; return h.find(c=>c.bonus)||h.find(c=>!c.dummy&&fieldOf(c.m).length)||h[0]; }
+function setDeadline(ms){ S.deadline=ms?Date.now()+ms:0; }
 
 /* 방장: 손님에게 보낼 화면 (손님 눈으로 뒤집어서) */
 function cardRef(c){ return c.id; }
@@ -567,7 +585,7 @@ function viewFor(){
     caps:[S.caps[1].map(cardRef),S.caps[0].map(cardRef)], go:[S.go[1],S.go[0]], shake:[S.shake[1],S.shake[0]], bomb:[S.bomb[1],S.bomb[0]],
     ppeok:Object.fromEntries(Object.entries(S.ppeok).map(([m,p])=>[m,1-p])), taking:[...S.taking],
     picking:(S.picking&&S.pickFor===1)?S.picking.map(cardRef):null,
-    turn:1-S.turn, myTurn:S.awaitGuest==='play', over:!!S.over, from:fromOut, id:S.gid};
+    turn:1-S.turn, myTurn:S.awaitGuest==='play', over:!!S.over, from:fromOut, id:S.gid, seq:S.seq||0, left:S.deadline?Math.max(0,S.deadline-Date.now()):0};
 }
 function sendView(){ if(NET.role==='host'&&S) netSend(viewFor()); }
 
@@ -582,8 +600,8 @@ function applyView(v){
   S.caps=v.caps.map(a=>a.map(cardOf)); S.go=v.go; S.shake=v.shake; S.bomb=v.bomb; S.ppeok=v.ppeok;
   S.taking=new Set(v.taking); S.turn=v.turn; S.over=v.over; S.busy=!v.myTurn;
   S.picking=v.picking?v.picking.map(cardOf):null;
-  S.from=new Map(v.from);
-  if(S.picking){ pickResolve=c=>{ netSend({type:'pick',id:c.id}); S.picking=null; render(); }; setMsg(`<b>${S.picking[0].m}월</b> 패가 두 장이에요. 먹을 패를 누르세요.`); }
+  S.seq=v.seq; S.from=new Map(v.from); S.deadline=v.left?Date.now()+v.left:0;
+  if(S.picking){ pickResolve=c=>{ netSend({type:'pick',id:c.id,seq:S.seq}); S.picking=null; render(); }; setMsg(`<b>${S.picking[0].m}월</b> 패가 두 장이에요. 먹을 패를 누르세요.`); }
   else if(v.myTurn) setMsg('<b>내 차례</b>예요. 낼 패를 누르세요.');
   else if(!v.over) setMsg(`${esc(NET.opp.name)} 님 차례예요…`);
   render(fresh?{stagger:35}:{});
@@ -592,7 +610,8 @@ function applyView(v){
 /* 메시지 받기 */
 function onNet(o){
   if(!o||typeof o!=='object') return;
-  if(o.type==='hello'){ NET.opp={name:String(o.name||'상대').slice(0,8),av:+o.av||0,money:+o.money||0};
+  if(o.type==='bye') return endOnline('상대가 나갔어요.');
+  if(o.type==='hello'){ NET.opp={name:String(o.name||'상대').slice(0,8),av:+o.av||0,money:+o.money||0}; if(NET.role==='host') NET.oppToken=o.token||null;
     if(NET.role==='host'&&!NET.started){ NET.started=true; closeModal(); netSend({type:'hello',...myProfile()}); startOnline(); }
     else if(NET.role==='guest'){ closeModal(); showScreen('game'); render(); setMsg('방장이 패를 돌리는 중…'); }
     return; }
@@ -600,7 +619,8 @@ function onNet(o){
     if(o.type==='view') return applyView(o);
     if(o.type==='fx'){ flash(o.alt||o.text,o.sound,o.small); return; }
     if(o.type==='sfx'){ sfx(o.k); return; }
-    if(o.type==='ask'&&o.kind==='go'){ askGo(o.sc).then(v=>netSend({type:'go',v})); return; }
+    if(o.type==='ask'&&o.kind==='go'){ if(S) S.deadline=o.left?Date.now()+o.left:0; askGo(o.sc).then(v=>netSend({type:'go',v,seq:o.seq})); return; }
+    if(o.type==='timeout'){ closeModal(); if(S){ S.picking=null; pickResolve=null; } return; }
     if(o.type==='result') return guestResult(o);
     if(o.type==='nagari') return guestNagari(o);
   } else if(NET.role==='host'){
@@ -608,25 +628,59 @@ function onNet(o){
     const w=NET.waiters[o.type]; if(w){ delete NET.waiters[o.type]; w(o); }
   }
 }
-function onNetClose(){
-  if(!NET.role) return;
-  const wasPlaying=S&&!S.over;
-  netReset();
+/* 연결이 끊겼을 때: 방장은 60초 기다리고, 손님은 60초 동안 다시 붙어 보기 */
+const LOST_MS=60000;
+function endOnline(msg){
+  if(!NET.role&&!NET.lost) return;
   if(S){ S.aborted=true; S.over=true; }
-  modal('연결이 끊겼어요',`<p>${wasPlaying?'상대와 연결이 끊겨서 이번 판은 여기서 끝나요.':'상대가 나갔어요.'}</p>`,[{t:'메인 화면',v:1,cls:'gold'}]).then(home);
+  netReset();
+  modal('연결이 끊겼어요',`<p>${msg}</p>`,[{t:'메인 화면',v:1,cls:'gold'}]).then(home);
 }
-function netReset(){ const c=NET.conn, p=NET.peer; NET.role=null; NET.conn=null; NET.peer=null; NET.started=false; NET.waiters={}; NET.againMe=NET.againOpp=false; clearTimeout(NET.timer);
-  try{ c&&c.close(); }catch(e){} try{ p&&p.destroy(); }catch(e){} }
+function onConnLost(conn){
+  if(!NET.role||conn!==NET.conn||NET.lost) return;
+  NET.lost=true;
+  if(NET.role==='host') return hostWaitBack();
+  guestReconnect();
+}
+function hostWaitBack(){
+  const until=Date.now()+LOST_MS;
+  modal('상대 연결이 끊겼어요',`<p>${esc(NET.opp?NET.opp.name:'상대')} 님이 다시 들어오기를 기다리는 중이에요.</p><p class="note" id="lostNote">60초 동안 기다려요.</p>`,[{t:'그만 기다리기',v:'out'}]).then(v=>{ if(v==='out'&&NET.lost) endOnline('게임을 끝냈어요.'); });
+  clearInterval(NET.lostTimer);
+  NET.lostTimer=setInterval(()=>{ if(!NET.lost){ clearInterval(NET.lostTimer); return; }
+    const s=Math.ceil((until-Date.now())/1000); const n=$('#lostNote'); if(n) n.textContent=`${Math.max(0,s)}초 더 기다려요.`;
+    if(s<=0){ clearInterval(NET.lostTimer); endOnline('상대가 돌아오지 않아서 게임이 끝났어요.'); } },500);
+}
+async function guestReconnect(){
+  const until=Date.now()+LOST_MS;
+  modal('연결이 끊겼어요','<p>다시 연결하는 중이에요…</p><p class="note">화면을 끄지 말고 잠깐만 기다려 주세요.</p>',[{t:'나가기',v:'out'}]).then(v=>{ if(v==='out'&&NET.lost) endOnline('게임을 끝냈어요.'); });
+  while(NET.lost&&Date.now()<until){
+    try{
+      let p=NET.peer;
+      if(!p||p.destroyed){ p=await newPeer(); NET.peer=p; }
+      else if(p.disconnected){ try{ p.reconnect(); }catch(e){} await sleep(1500); }
+      const conn=await tryConnect(p,NET.hostId,5000);
+      if(conn&&NET.lost){ NET.lost=false; wireConn(conn,'guest'); conn.send({type:'rejoin',token:NET.token}); closeModal(); return; }
+    }catch(e){}
+    await sleep(2000);
+  }
+  if(NET.lost) endOnline('다시 연결하지 못해서 게임이 끝났어요.');
+}
+function hostResync(){ sendView(); if(NET.pendingAsk) netSend({...NET.pendingAsk,left:S&&S.deadline?Math.max(0,S.deadline-Date.now()):0}); if(S&&S.over&&NET.lastResult) netSend(NET.lastResult); }
+function netReset(){ const c=NET.conn, p=NET.peer; try{ if(c&&c.open) c.send({type:'bye'}); }catch(e){}
+  NET.role=null; NET.conn=null; NET.peer=null; NET.started=false; NET.waiters={}; NET.againMe=NET.againOpp=false; NET.lost=false; NET.pendingAsk=null; NET.lastResult=null; NET.hostId=null; NET.oppToken=null;
+  clearTimeout(NET.timer); clearTimeout(NET.myTimer); clearInterval(NET.lostTimer);
+  setTimeout(()=>{ try{ c&&c.close(); }catch(e){} try{ p&&p.destroy(); }catch(e){} },250); }
 function wireConn(conn,role){
   NET.conn=conn; NET.role=role;
-  conn.on('data',onNet); conn.on('close',onNetClose); conn.on('error',onNetClose);
+  conn.on('data',onNet); conn.on('close',()=>onConnLost(conn)); conn.on('error',()=>onConnLost(conn));
 }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&NET.role&&NET.conn&&!NET.conn.open&&!NET.lost) onConnLost(NET.conn); });
 
 /* 방장 쪽 게임 시작 */
 async function startOnline(){
   NET.againMe=NET.againOpp=false; $('#modal').hidden=true;
   showScreen('game'); $('#bubble').hidden=true;
-  newGame(); S.gid=Date.now();
+  newGame(); S.gid=Date.now(); NET.lastResult=null; NET.pendingAsk=null;
   S.hands[0].forEach(c=>S.from.set(c.id,'deck')); S.field.forEach(c=>S.from.set(c.id,'deck'));
   render({stagger:35}); sfx('deal');
   setMsg(S.turn===0?'내가 먼저 쳐요.':`${esc(NET.opp.name)} 님이 먼저 쳐요.`);
@@ -640,9 +694,11 @@ async function startOnline(){
 }
 /* 방장: 손님 차례 기다리기 */
 async function remoteTurn(){
-  S.busy=true; S.awaitGuest='play'; setMsg(`${esc(NET.opp.name)} 님 차례예요…`); render();
+  S.seq=(S.seq||0)+1; S.busy=true; S.awaitGuest='play'; setDeadline(TURN_MS+1000); setMsg(`${esc(NET.opp.name)} 님 차례예요…`); render();
   for(;;){
-    const o=await netWait('play'); if(S.over||S.aborted) return;
+    const o=await netWaitFor('play',S.deadline-Date.now()); if(S.over||S.aborted) return;
+    if(!o){ S.awaitGuest=null; netSend({type:'timeout'}); return play(1,autoCard(1),{}); }
+    if(o.seq!==S.seq) continue;
     const card=S.hands[1].find(c=>c.id===o.id); if(!card) continue;
     const opt={}; const same=S.hands[1].filter(x=>x.m===card.m).length, f=fieldOf(card.m).length;
     if(o.opt&&o.opt.bomb&&!card.bonus&&!card.dummy&&same===3&&f===1) opt.bomb=true;
@@ -651,13 +707,17 @@ async function remoteTurn(){
   }
 }
 async function remotePick(cands){
-  S.picking=cands; S.pickFor=1; setMsg(`${esc(NET.opp.name)} 님이 먹을 패를 고르는 중…`); render();
-  for(;;){ const o=await netWait('pick'); const c=cands.find(x=>x.id===o.id); if(c){ S.picking=null; S.pickFor=null; return c; } }
+  S.seq=(S.seq||0)+1; S.picking=cands; S.pickFor=1; setDeadline(TURN_MS+1000); setMsg(`${esc(NET.opp.name)} 님이 먹을 패를 고르는 중…`); render();
+  for(;;){ const o=await netWaitFor('pick',S.deadline-Date.now());
+    if(!o){ netSend({type:'timeout'}); S.picking=null; S.pickFor=null; setDeadline(0); return cands[0]; }
+    if(o.seq!==S.seq) continue;
+    const c=cands.find(x=>x.id===o.id); if(c){ S.picking=null; S.pickFor=null; setDeadline(0); return c; } }
 }
-async function remoteGo(sc){ setMsg(`${esc(NET.opp.name)} 님이 고·스톱을 고르는 중…`); netSend({type:'ask',kind:'go',sc}); const o=await netWait('go'); return !!o.v; }
+async function remoteGo(sc){ S.seq=(S.seq||0)+1; setMsg(`${esc(NET.opp.name)} 님이 고·스톱을 고르는 중…`); setDeadline(TURN_MS+1000); render(); NET.pendingAsk={type:'ask',kind:'go',sc,seq:S.seq}; netSend({...NET.pendingAsk,left:TURN_MS}); let o; for(;;){ o=await netWaitFor('go',S.deadline-Date.now()); if(!o||o.seq===S.seq) break; } NET.pendingAsk=null; setDeadline(0); if(!o){ netSend({type:'timeout'}); return false; } return !!o.v; }
 
 /* 손님: 결과 받기 */
 async function guestResult(o){
+  if(S&&S.resultShown===o.gid) return; if(S) S.resultShown=o.gid;
   const w=1-o.w; let delta;
   if(w===0){ delta=o.won; store.money+=o.won; store.wins++; } else { delta=-Math.min(o.won,store.money); store.money+=delta; store.losses++; }
   store.best=Math.max(store.best,store.money); save(); render();
@@ -690,10 +750,12 @@ const PEER_PRE='hanpanmande-v1-';
 const QSLOTS=6;
 function newPeer(id){
   return new Promise((res,rej)=>{
-    const p=id?new Peer(id,{debug:0}):new Peer({debug:0});
-    const t=setTimeout(()=>{ try{p.destroy();}catch(e){} rej(new Error('timeout')); },9000);
-    p.on('open',()=>{ clearTimeout(t); res(p); });
-    p.on('error',e=>{ clearTimeout(t); try{p.destroy();}catch(_){} rej(e); });
+    const p=id?new Peer(id,{debug:0}):new Peer({debug:0}); let opened=false;
+    const t=setTimeout(()=>{ if(opened) return; try{p.destroy();}catch(e){} rej(new Error('timeout')); },9000);
+    p.on('open',()=>{ opened=true; clearTimeout(t); res(p); });
+    p.on('error',e=>{ if(opened) return; clearTimeout(t); try{p.destroy();}catch(_){} rej(e); });
+    // 신호 서버와 잠깐 끊기면 다시 붙기 (게임 연결은 그대로)
+    p.on('disconnected',()=>{ setTimeout(()=>{ try{ if(!p.destroyed&&p.disconnected) p.reconnect(); }catch(e){} },1500); });
   });
 }
 function tryConnect(peer,target,ms=4000){
@@ -711,6 +773,12 @@ function tryConnect(peer,target,ms=4000){
 function hostListen(peer){
   peer.on('connection',conn=>{
     conn.on('open',()=>{
+      if(NET.role==='host'&&NET.lost){
+        conn.send({type:'welcome'});
+        conn.on('data',function rj(d){ if(d&&d.type==='rejoin'&&d.token&&d.token===NET.oppToken&&NET.lost){ conn.off('data',rj); NET.lost=false; clearInterval(NET.lostTimer); wireConn(conn,'host'); closeModal(); hostResync(); } });
+        setTimeout(()=>{ if(NET.conn!==conn) try{conn.close();}catch(e){} },8000);
+        return;
+      }
       if(NET.role){ conn.send({type:'busy'}); setTimeout(()=>conn.close(),300); return; }
       clearTimeout(NET.timer); NET.peer=peer; wireConn(conn,'host'); conn.send({type:'welcome'});
     });
@@ -730,7 +798,7 @@ async function quickMatch(){
     const me=await newPeer(); job.peer=me; if(job.cancelled) return me.destroy();
     for(let s=1;s<=QSLOTS&&!job.cancelled;s++){
       const conn=await tryConnect(me,PEER_PRE+'q'+s);
-      if(conn&&!job.cancelled){ NET.peer=me; wireConn(conn,'guest'); searching=null; netSend({type:'hello',...myProfile()}); return; }
+      if(conn&&!job.cancelled){ NET.peer=me; NET.hostId=PEER_PRE+'q'+s; wireConn(conn,'guest'); searching=null; netSend({type:'hello',...myProfile()}); return; }
     }
     me.destroy(); if(job.cancelled) return;
     // 2) 없으면 내가 기다리기
@@ -787,10 +855,15 @@ async function joinRoom(){
     const me=await newPeer(); searching={cancelled:false,peer:me};
     const conn=await tryConnect(me,PEER_PRE+'r'+code,6000);
     if(!conn){ me.destroy(); searching=null; return modal('방을 못 찾았어요',`<p>${code}번 방이 없거나 이미 시작했어요. 코드를 다시 확인해 주세요.</p>`,[{t:'확인',v:1,cls:'gold'}]); }
-    NET.peer=me; searching=null; wireConn(conn,'guest'); netSend({type:'hello',...myProfile()});
+    NET.peer=me; NET.hostId=PEER_PRE+'r'+code; searching=null; wireConn(conn,'guest'); netSend({type:'hello',...myProfile()});
   }catch(e){ modal('연결이 안 돼요','<p>인터넷 연결을 확인하고 다시 해 주세요.</p>',[{t:'확인',v:1,cls:'gold'}]); }
 }
 
+/* 남은 시간 표시 (온라인에서만) */
+setInterval(()=>{ const el=$('#tick'); if(!el) return;
+  const on=online()&&S&&S.deadline&&!S.over&&!NET.lost;
+  if(!on){ el.hidden=true; return; }
+  const sec=Math.max(0,Math.ceil((S.deadline-Date.now())/1000)); el.hidden=false; el.textContent=`${sec}초`; el.classList.toggle('warn',sec<=5); },250);
 /* ---------- 상대 캐릭터 ---------- */
 const CH=[null,
  {name:'복실이',kind:'dog',lv:'왕초보',desc:'오늘 화투를 처음 배운 20살 카페 알바생. 아무 패나 막 내요.',bg:'#f6e3bf',
@@ -989,6 +1062,8 @@ function choose(p,cands){
   return humanPick(cands);
 }
 function humanPick(cands){
+  if(NET.role==='host'){ setDeadline(TURN_MS); const pr=new Promise(res=>{ S.picking=cands; pickResolve=res; setMsg(`<b>${cands[0].m}월</b> 패가 두 장이에요. 먹을 패를 누르세요.`); render(); });
+    return Promise.race([pr,sleep(TURN_MS).then(()=>cands[0])]).then(c=>{ S.picking=null; pickResolve=null; setDeadline(0); return c; }); }
   return new Promise(res=>{ S.picking=cands; pickResolve=res; setMsg(`<b>${cands[0].m}월</b> 패가 두 장이에요. 먹을 패를 누르세요.`); render(); });
 }
 function askGo(sc){
@@ -997,6 +1072,7 @@ function askGo(sc){
     [{t:'고!',v:true,cls:'red'},{t:'스톱',v:false,cls:'gold'}]);
 }
 
+function hostAskGo(sc){ setDeadline(TURN_MS); render(); return Promise.race([askGo(sc),sleep(TURN_MS).then(()=>{ closeModal(); return false; })]).then(v=>{ setDeadline(0); return v; }); }
 /* ---------- 한 수 진행 ---------- */
 function stealPi(from,to){
   const pis=S.caps[from].filter(c=>c.t==='pi'); if(!pis.length) return false;
@@ -1009,7 +1085,7 @@ async function takeCards(cards){
   return cards;
 }
 async function play(p,card,opt={}){
-  S.busy=true; S.picking=null;
+  S.busy=true; S.picking=null; S.playing=true; S.deadline=0; clearTimeout(NET.myTimer);
   const hand=S.hands[p], opp=1-p, who=p===0?'':'컴퓨터: ';
   if(card.bonus){
     S.from.set(card.id,p===1?'opp':'me');
@@ -1066,7 +1142,7 @@ async function play(p,card,opt={}){
   const sc=score(S.caps[p]).total;
   if(sc>=7&&sc>S.goScore[p]){
     let go=false;
-    if(hand.length>0&&S.deck.length>0) go=p===0?await askGo(sc):(NET.role==='host'?await remoteGo(sc):aiGo(p,sc));
+    if(hand.length>0&&S.deck.length>0) go=p===0?await (NET.role==='host'?hostAskGo(sc):askGo(sc)):(NET.role==='host'?await remoteGo(sc):aiGo(p,sc));
     if(!go){ if(p===1) say('stop','h'); await flash('스톱!','go'); if(p===1) await sleep(900); return settle(p); }
     S.go[p]++; S.goScore[p]=sc; render(); await flash(S.go[p]+'고!','go'); if(p===1) say('go','h');
   }
@@ -1074,6 +1150,7 @@ async function play(p,card,opt={}){
 }
 async function nextTurn(){
   if(S.over||S.aborted) return;
+  S.playing=false;
   if(!S.hands[0].length&&!S.hands[1].length) return nagari();
   if(!S.hands[S.turn].length) S.turn=1-S.turn;
   const p=S.turn;
@@ -1081,7 +1158,11 @@ async function nextTurn(){
   if(p===1){ S.busy=true; setMsg(`${CH[store.level].name} 차례예요…`); render(); await sleep(700); const mv=aiChoose(1); return play(1,mv.card,mv.opt); }
   waitHuman();
 }
-function waitHuman(){ S.busy=false; setMsg('<b>내 차례</b>예요. 낼 패를 누르세요.'); render(); }
+function waitHuman(){
+  S.busy=false; setMsg('<b>내 차례</b>예요. 낼 패를 누르세요.');
+  if(NET.role==='host'){ setDeadline(TURN_MS); clearTimeout(NET.myTimer);
+    NET.myTimer=setTimeout(()=>{ if(S&&S.turn===0&&!S.over&&!S.playing){ closeModal(); play(0,autoCard(0),{}); } },TURN_MS); }
+  render(); }
 async function onHumanCard(c){
   if(!S||S.busy||S.turn!==0||S.over) return;
   S.busy=true; if(NET.role!=='guest') render();
@@ -1091,7 +1172,8 @@ async function onHumanCard(c){
     if(same===3&&f===1){ if(await modal('폭탄 할까요?',`<p>${c.m}월 패 3장을 한꺼번에 내서 바닥 패까지 4장을 다 먹어요. 상대 피도 1장 뺏고, 이기면 <b>2배</b>!</p>`,[{t:'폭탄!',v:true,cls:'red'},{t:'한 장만 내기',v:false}])) opt.bomb=true; }
     else if(same===3&&f===0){ if(await modal('흔들까요?',`<p>${c.m}월 패를 3장 들고 있어요. 흔들고 이기면 점수 <b>2배</b>!</p>`,[{t:'흔들기',v:true,cls:'red'},{t:'그냥 내기',v:false}])) opt.shake=true; }
   }
-  if(NET.role==='guest'){ netSend({type:'play',id:c.id,opt}); setMsg('…'); render(); return; }
+  if(NET.role==='guest'){ netSend({type:'play',id:c.id,opt,seq:S.seq}); setMsg('…'); render(); return; }
+  if(S.playing||S.over) return;
   return play(0,c,opt);
 }
 
@@ -1133,7 +1215,7 @@ async function settle(w,special){
 }
 async function hostSettle(w,lines,pts,won){
   NET.carry=1; NET.starter=w;
-  netSend({type:'result',w,pts,won,lines});
+  NET.lastResult={type:'result',w,pts,won,lines,gid:S.gid}; netSend(NET.lastResult);
   let delta; if(w===0){ delta=won; store.money+=won; store.wins++; } else { delta=-Math.min(won,store.money); store.money+=delta; store.losses++; }
   store.best=Math.max(store.best,store.money); save(); render();
   sfx(w===0?'win':'lose'); setMsg(w===0?'<b>이겼어요!</b>':`${esc(NET.opp.name)} 님이 났어요.`);
@@ -1227,6 +1309,23 @@ $('#menuBtn').onclick=async()=>{
   const v=await p;
   if(v==='home'){ if(S){ S.aborted=true; S.over=true; } netReset(); home(); }
 };
+
+// 홈 화면 앱
+let installEvt=null;
+const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); installEvt=e; renderInstall(); });
+function renderInstall(){ const b=$('#installBtn'); if(!b) return; b.hidden=!ONLINE_OK||isStandalone(); }
+async function doInstall(){
+  sfx('ui');
+  if(installEvt){ installEvt.prompt(); try{ await installEvt.userChoice; }catch(e){} installEvt=null; renderInstall(); return; }
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  modal('홈 화면에 추가하기', ios
+    ? '<p>1. 사파리 아래쪽 <b>공유 버튼</b>(네모에 위 화살표)을 눌러요.</p><p>2. <b>홈 화면에 추가</b>를 눌러요.</p><p>3. 오른쪽 위 <b>추가</b>를 누르면 끝!</p>'
+    : '<p>1. 브라우저 오른쪽 위 <b>점 세 개(⋮)</b> 메뉴를 눌러요.</p><p>2. <b>홈 화면에 추가</b> 또는 <b>앱 설치</b>를 눌러요.</p><p>3. <b>추가</b>를 누르면 끝!</p><p class="note">삼성 인터넷은 아래쪽 메뉴(≡) → 현재 페이지 추가 → 홈 화면이에요.</p>',
+    [{t:'알겠어요',v:1,cls:'gold'}]);
+}
+if(ONLINE_OK&&'serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+$('#installBtn').onclick=doInstall; renderInstall();
 
 applyBg(); home();
 </script>
