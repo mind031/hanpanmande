@@ -1098,7 +1098,10 @@ function aiGo(p,sc){
   if(L===4) return left>=3&&op<=3&&sc<15;
   return left>=3&&(op<=2||(op<=4&&left>=6))&&sc<20;
 }
+// 두 장이 똑같은 값어치(예: 둘 다 그냥 피)면 묻지 않고 아무거나
+const sameKind=(a,b)=>a.t===b.t&&(a.v||0)===(b.v||0)&&a.dan===b.dan&&!!a.bird===!!b.bird&&!!a.kook===!!b.kook&&!!a.bi===!!b.bi;
 function choose(p,cands){
+  if(cands.length===2&&sameKind(cands[0],cands[1])) return Promise.resolve(cands[Math.random()<.5?0:1]);
   if(p===1&&NET.role==='host') return remotePick(cands);
   if(p===1) return Promise.resolve(cands.reduce((a,b)=>cardVal(b,1,store.level>=3)>cardVal(a,1,store.level>=3)?b:a));
   return humanPick(cands);
