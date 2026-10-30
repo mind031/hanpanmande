@@ -87,6 +87,14 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--gold);outline-o
 .char .lv{font-size:11px;font-weight:700;color:var(--muted);border:1px solid var(--stroke-2);border-radius:999px;padding:2px 8px;margin-left:8px;vertical-align:2px}
 .char .ds{font-size:13px;color:var(--muted);margin-top:3px;line-height:1.45}
 .char.on{border-color:var(--gold);background:rgba(242,198,109,.12)}
+.wallet{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.bar{flex:1;max-width:120px;height:6px;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#f2c66d,#ffe3a1)}
+.char.out{opacity:.55;filter:grayscale(.7);cursor:not-allowed}
+.oi{color:#fff;background:var(--accent);border-radius:999px;padding:1px 8px;font-size:11px}
+.startBtn:disabled{background:var(--glass-2);box-shadow:none;color:var(--muted);cursor:default}
+.sheet .allin{margin:14px 0 0;text-align:center;font-size:20px;font-weight:800;color:var(--accent);line-height:1.5}
+.sheet .allin span{font-size:13px;font-weight:500;color:var(--muted)}
 .char.on .lv{color:#1b1406;background:var(--gold);border-color:var(--gold)}
 .stars{color:var(--gold);font-size:11px;letter-spacing:1px}
 .startBtn{font-size:20px;font-weight:700;min-height:60px;border:0;border-radius:var(--r-md);background:var(--accent);color:var(--accent-ink);cursor:pointer;
@@ -339,6 +347,14 @@ function dailyRefill(){
   return refilled;
 }
 
+/* 캐릭터별 하루 지갑: 매일 한도까지 다시 채워지고, 다 잃으면(올인) 그날은 더 못 쳐요 */
+const AI_LIMIT=[0,30000,50000,100000,200000,500000];
+function aiRefill(){
+  const t=today();
+  if(!store.aiw||store.aiDay!==t){ store.aiw={}; for(let n=1;n<=5;n++) store.aiw[n]=AI_LIMIT[n]; store.aiDay=t; save(); }
+}
+const aiMoney=n=>{ aiRefill(); return store.aiw[n]; };
+const allIn=n=>aiMoney(n)<=0;
 /* ---------- 패 ---------- */
 function build(){
   const D=[[1,'g','th','p','p'],[2,'yb','th','p','p'],[3,'g','th','p','p'],[4,'yb','tc','p','p'],[5,'y','tc','p','p'],[6,'y','tb','p','p'],
@@ -973,7 +989,7 @@ function render(opt={}){
   $('#purse').innerHTML=`내 돈 <b>${fmt(store.money)}</b>냥`;
   const pr=store.profile||{name:'나',av:0}; $('#myName').textContent=pr.name; $('#myAv').innerHTML=avatarHTML(pr.av,pr.name);
   if(online()&&NET.opp){ $('#oppName').textContent=NET.opp.name; $('#oppMoney').textContent=''; const f=$('#oppFace'); if(f.dataset.who!=='net'+NET.opp.av){ f.dataset.who='net'+NET.opp.av; f.innerHTML=avatarHTML(NET.opp.av,NET.opp.name); } }
-  else { $('#oppName').textContent=`${CH[store.level].name}`; $('#oppMoney').textContent=`${fmt(store.ai)}냥`; const f=$('#oppFace'); if(f.dataset.who&&f.dataset.who.startsWith('net')){ f.dataset.who=''; setFace('n'); } }
+  else { $('#oppName').textContent=`${CH[store.level].name}`; $('#oppMoney').textContent=`${fmt(aiMoney(store.level))}냥`; const f=$('#oppFace'); if(f.dataset.who&&f.dataset.who.startsWith('net')){ f.dataset.who=''; setFace('n'); } }
   if(!S) return;
   $('#oppFace').classList.toggle('turn',S.turn===1&&!S.over); $('#myAv').classList.toggle('turn',S.turn===0&&!S.over);
   // 움직이기 전 자리 기억
@@ -1217,9 +1233,13 @@ async function settle(w,special){
   const pts=base*mult, won=pts*RATE;
   if(online()) return hostSettle(w,lines,pts,won);
   let delta;
-  if(w===0){ delta=won; store.money+=won; store.ai-=won; store.wins++; }
-  else { delta=-Math.min(won,store.money); store.money+=delta; store.ai-=delta; store.losses++; }
-  let aiNote=''; if(store.ai<=0){ store.ai=100000; aiNote=`<p class="note">${CH[store.level].name} 지갑이 비어서 다시 채웠어요.</p>`; }
+  const lv=store.level; aiRefill();
+  if(w===0){ delta=Math.min(won,store.aiw[lv]); store.money+=delta; store.aiw[lv]-=delta; store.wins++; }
+  else { delta=-Math.min(won,store.money); store.money+=delta; store.aiw[lv]-=delta; store.losses++; }
+  const broke=store.aiw[lv]<=0;
+  let aiNote='';
+  if(w===0&&delta<won) aiNote+=`<p class="note">${CH[lv].name}${iga(CH[lv].name)} 가진 돈이 ${fmt(delta)}냥뿐이라 그만큼만 받았어요.</p>`;
+  if(broke) aiNote+=`<p class="allin">${CH[lv].name} 올인! 🎉<br><span>오늘은 더 칠 수 없어요. 내일 ${fmt(AI_LIMIT[lv])}냥 채워서 다시 와요.</span></p>`;
   store.best=Math.max(store.best,store.money); store.starter=w; store.carry=1; save(); render();
   sfx(w===0?'win':'lose'); const ch=CH[store.level]; say(w===0?'lose':'win',w===0?'s':'h');
   setMsg(w===0?'<b>이겼어요!</b>':`${ch.name}${iga(ch.name)} 났어요.`);
@@ -1227,7 +1247,9 @@ async function settle(w,special){
   const body=`<div class="who2"><div class="pf">${portrait(store.level,w===0?'s':'h')}</div><div class="say">${quote}</div></div><ul class="lines">${lines.map(([a,b])=>`<li><span>${a}</span><b>${b}</b></li>`).join('')}</ul>
     <div class="total">${fmt(pts)}점 × ${RATE}냥 = ${w===0?'+':'−'}${fmt(Math.abs(delta))}냥</div>
     <p class="note" style="text-align:center">내 돈 ${fmt(store.money)}냥 · ${store.wins}승 ${store.losses}패</p>${aiNote}`;
-  const v=await modal(w===0?'이겼어요!':'졌어요',body,[{t:'한 판만 더!',v:'again',cls:'red'},{t:'메인 화면',v:'home'}]);
+  const btns=broke?[{t:'다른 상대 고르기',v:'home',cls:'red'}]:[{t:'한 판만 더!',v:'again',cls:'red'},{t:'메인 화면',v:'home'}];
+  if(broke){ sfx('sweep'); }
+  const v=await modal(broke?'올인 시켰어요!':(w===0?'이겼어요!':'졌어요'),body,btns);
   v==='again'?start():home();
 }
 async function hostSettle(w,lines,pts,won){
@@ -1253,6 +1275,7 @@ async function nagari(){
 function showScreen(name){ document.body.dataset.screen=name; $('#home').hidden=name!=='home'; $('#game').hidden=name!=='game'; window.scrollTo(0,0); }
 async function start(){
   netReset();
+  if(allIn(store.level)){ return home(); }
   showScreen('game'); $('#bubble').hidden=true; setFace('n');
   newGame();
   // 패 돌리기: 더미에서 손과 바닥으로 날아감
@@ -1293,10 +1316,13 @@ function renderHome(){
   $('#meBtn').innerHTML=`<span class="avw">${avatarHTML(pr.av,store.profile?pr.name:'?')}</span><span><span class="nm">${esc(pr.name)}</span></span><span class="ed">프로필 바꾸기</span>`;
   $('#homeMoney').innerHTML=`내 돈 <b>${fmt(store.money)}</b>냥`;
   $('#homeRec').textContent=`${store.wins}승 ${store.losses}패`;
-  $('#chars').innerHTML=[1,2,3,4,5].map(n=>{ const c=CH[n];
-    return `<button type="button" class="char ${store.level===n?'on':''}" data-lv="${n}" aria-pressed="${store.level===n}">
-      <span class="pf">${portrait(n,store.level===n?'h':'n')}</span>
-      <span class="t"><span class="nm">${c.name}</span><span class="lv">${c.lv}</span><br><span class="stars">${'★'.repeat(n)}${'☆'.repeat(5-n)}</span><div class="ds">${c.desc}</div></span></button>`; }).join('');
+  if(allIn(store.level)){ const ok=[1,2,3,4,5].find(n=>!allIn(n)); if(ok) store.level=ok; }
+  $('#chars').innerHTML=[1,2,3,4,5].map(n=>{ const c=CH[n], m=aiMoney(n), out=m<=0, pct=Math.max(0,Math.round(m/AI_LIMIT[n]*100));
+    return `<button type="button" class="char ${store.level===n&&!out?'on':''} ${out?'out':''}" data-lv="${n}" aria-pressed="${store.level===n}" ${out?'aria-disabled="true"':''}>
+      <span class="pf">${portrait(n,out?'s':store.level===n?'h':'n')}</span>
+      <span class="t"><span class="nm">${c.name}</span><span class="lv">${c.lv}</span><br><span class="stars">${'★'.repeat(n)}${'☆'.repeat(5-n)}</span><div class="ds">${c.desc}</div>
+      <span class="wallet">${out?'<b class="oi">올인</b> 내일 다시 와요':`<span class="bar"><i style="width:${pct}%"></i></span><span class="wm">${fmt(m)} / ${fmt(AI_LIMIT[n])}냥</span>`}</span></span></button>`; }).join('');
+  const allOut=[1,2,3,4,5].every(allIn); $('#startBtn').disabled=allOut; $('#startBtn').textContent=allOut?'오늘은 모두 올인! 내일 만나요':'컴퓨터랑 한 판';
   wireBgPick($('#bgPickHome'));
   document.querySelectorAll('[data-snd]').forEach(b=>b.classList.toggle('on',(b.dataset.snd==='1')===store.sound));
   if(store.carry>1){ $('#homeNote').hidden=false; $('#homeNote').textContent=`지난 판이 나가리라 이번 판은 ×${store.carry}`; }
@@ -1308,10 +1334,10 @@ function home(){
   renderHome();
   if(!store.profile) setTimeout(()=>editProfile(true),300);
 }
-$('#chars').addEventListener('click',e=>{ const b=e.target.closest('[data-lv]'); if(!b) return; store.level=+b.dataset.lv; save(); voice(CH[store.level].kind); renderHome(); });
+$('#chars').addEventListener('click',e=>{ const b=e.target.closest('[data-lv]'); if(!b) return; if(allIn(+b.dataset.lv)){ sfx('ui'); return modal(`${CH[+b.dataset.lv].name} 올인`,`<p>오늘 가진 돈을 다 잃었어요.</p><p>내일 ${fmt(AI_LIMIT[+b.dataset.lv])}냥을 채워서 다시 와요.</p>`,[{t:'알겠어요',v:1,cls:'gold'}]); } store.level=+b.dataset.lv; save(); voice(CH[store.level].kind); renderHome(); });
 document.querySelectorAll('[data-snd]').forEach(b=>b.onclick=()=>{ store.sound=b.dataset.snd==='1'; save(); if(store.sound) sfx('ui'); renderHome(); });
 $('#meBtn').onclick=()=>{ sfx('ui'); editProfile(false); };
-$('#startBtn').onclick=()=>{ ac(); sfx('drum'); start(); };
+$('#startBtn').onclick=()=>{ ac(); if(allIn(store.level)) return renderHome(); sfx('drum'); start(); };
 if(ONLINE_OK){ $('#onlineBox').hidden=false; $('#quickBtn').onclick=()=>{ ac(); sfx('ui'); if(!store.profile) return editProfile(true); quickMatch(); }; $('#friendBtn').onclick=()=>{ ac(); sfx('ui'); if(!store.profile) return editProfile(true); friendRoom(); }; }
 $('#menuBtn').onclick=async()=>{
   if(!$('#modal').hidden) return;
