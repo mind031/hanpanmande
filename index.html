@@ -1141,7 +1141,7 @@ async function play(p,card,opt={}){
   else if(opt.bomb){
     const three=hand.filter(c=>c.m===card.m); const f=fieldOf(card.m); three.forEach(c=>{ rm(hand,c); S.field.push(c); S.from.set(c.id,p===1?'opp':'me'); });
     render(); await sleep(450); await flash('폭탄!','bomb'); if(p===1) say('special','h');
-    taken.push(...f); steal++; S.bomb[p]++; hand.push(dummy(),dummy()); if(p===0) sortHand();
+    taken.push(...three,...f); steal++; S.bomb[p]++; hand.push(dummy(),dummy()); if(p===0) sortHand();
   } else {
     if(opt.shake){ S.shake[p]++; render(); await flash('흔들기!','shake'); }
     pre=fieldOf(card.m); k=pre.length; rm(hand,card); S.field.push(card); P=card; S.from.set(card.id,p===1?'opp':'me');
