@@ -383,6 +383,7 @@ function overlay(c){
 function face(c){
   if(FC[c.id]) return FC[c.id];
   if(c.dummy) return FC[c.id]='<img src="img/c-pass.webp" alt="" draggable="false">';
+  if(c.bonus) return FC[c.id]=`<img src="img/${['b-2a','b-2b','b-3'][c.i]||'b-2a'}.webp" alt="" draggable="false">`;
   if(!c.bonus) return FC[c.id]=`<img src="img/c-${c.m}-${c.i}.webp" alt="" draggable="false">`;
   const stripCol=c.bonus?'#b07a10':{gwang:'#b3121b',yeol:'#1d4f8a',tti:'#2e7a3b',pi:'#5d4a3a',dummy:'#666'}[c.t];
   const txt=c.dummy?'통과':c.bonus?label(c):`${c.m}월 ${label(c)}`;
@@ -397,7 +398,7 @@ function face(c){
 const BACK='<svg viewBox="0 0 60 92" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x=".6" y=".6" width="58.8" height="90.8" rx="5" fill="#a3141c" stroke="#5a0a0f"/><rect x="5" y="5" width="50" height="82" rx="3" fill="none" stroke="#f0b7a6" stroke-opacity=".5"/><path d="M30 18 L46 46 L30 74 L14 46Z" fill="none" stroke="#f0b7a6" stroke-opacity=".55" stroke-width="1.6"/><circle cx="30" cy="46" r="5" fill="#f0b7a6" fill-opacity=".45"/></svg>';
 
 // 화투 그림 미리 불러오기
-(function(){ for(let m=1;m<=12;m++) for(let i=0;i<4;i++){ const im=new Image(); im.src=`img/c-${m}-${i}.webp`; } })();
+(function(){ for(let m=1;m<=12;m++) for(let i=0;i<4;i++){ const im=new Image(); im.src=`img/c-${m}-${i}.webp`; } ['c-pass','b-2a','b-2b','b-3'].forEach(n=>{ const im=new Image(); im.src=`img/${n}.webp`; }); })();
 /* ---------- 소리: 패 소리 / 화면 소리 / 캐릭터 목소리를 따로 ---------- */
 let AC=null, NB=null;
 function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } } if(AC.state==='suspended') AC.resume(); return AC; }
