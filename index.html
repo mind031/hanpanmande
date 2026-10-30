@@ -3,6 +3,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0c0e12">
 <meta property="og:title" content="한 판만 더!">
+<meta property="og:image" content="https://mind031.github.io/hanpanmande/img/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <meta property="og:description" content="1:1 맞고 한 판! 컴퓨터랑, 사람이랑">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head><body>
@@ -52,6 +56,9 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--gold);outline-o
   background:linear-gradient(180deg,#fff3cf 0%,#f2c66d 45%,#c98f2c 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
   filter:drop-shadow(0 6px 18px rgba(0,0,0,.5));text-wrap:balance}
 .slogan{color:var(--muted);font-size:15px}
+.logoImg{display:block;width:min(100%,520px);height:auto;margin:0 auto 6px;filter:drop-shadow(0 12px 30px rgba(0,0,0,.55));-webkit-user-drag:none;animation:logoIn .6s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes logoIn{from{transform:scale(.92);opacity:.4}to{transform:none;opacity:1}}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .meBtn{display:flex;align-items:center;gap:14px;border-radius:var(--r-lg);padding:12px 16px;cursor:pointer;text-align:left;
   background:var(--glass);border:1px solid var(--stroke);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
 .meBtn .avw{width:48px;flex:none}
@@ -215,8 +222,8 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--gold);outline-o
 
 <main id="home" class="wrap">
   <div class="hero">
-    <div class="fan" id="fan"></div>
-    <h1 class="logo">한 판만 더!</h1>
+    <h1 class="sr-only">한 판만 더!</h1>
+    <img class="logoImg" src="img/logo-main.webp" alt="한 판만 더!" draggable="false">
     <div class="slogan">딱 한 판만… 진짜 마지막 한 판만</div>
   </div>
   <button class="meBtn" id="meBtn" type="button"></button>
@@ -1199,9 +1206,6 @@ function home(){
   renderHome();
   if(!store.profile) setTimeout(()=>editProfile(true),300);
 }
-// 메인 화면 부채꼴 화투
-(function(){ const all=build(); const pick=[all[0],all[28],all[8],all[44]];
-  const fan=$('#fan'); pick.forEach((c,i)=>{ const el=cardEl(c); el.style.transform=`translateX(-50%) rotate(${(i-1.5)*14}deg)`; el.style.zIndex=i; fan.appendChild(el); }); })();
 $('#chars').addEventListener('click',e=>{ const b=e.target.closest('[data-lv]'); if(!b) return; store.level=+b.dataset.lv; save(); voice(CH[store.level].kind); renderHome(); });
 document.querySelectorAll('[data-snd]').forEach(b=>b.onclick=()=>{ store.sound=b.dataset.snd==='1'; save(); if(store.sound) sfx('ui'); renderHome(); });
 $('#meBtn').onclick=()=>{ sfx('ui'); editProfile(false); };
