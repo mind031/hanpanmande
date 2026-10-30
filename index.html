@@ -32,7 +32,7 @@
   --sheet:rgba(24,26,32,.94);
   --f-body:'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
   --f-logo:'Hahmlet','Noto Serif KR',serif;
-  --fw:clamp(44px,11.5vw,66px);
+  --fw:clamp(56px,15.5vw,84px);
   --r-lg:22px; --r-md:16px; --r-sm:12px;
   --bgimg:none;
   color-scheme:dark;
@@ -140,30 +140,30 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--gold);outline-o
   background:var(--glass-2);border-radius:999px;padding:6px 14px}
 .who .score small{font-size:12px;font-weight:500;color:var(--muted)}
 .backs{display:flex;min-height:28px}
-.backs .card{--w:18px;box-shadow:none}
-.backs .card+.card{margin-left:-6px}
+.backs .card{--w:20px;box-shadow:none}
+.backs .card+.card{margin-left:-8px}
 .bubble{position:absolute;left:78px;top:60px;z-index:25;background:#fff;color:#16181d;font-size:15px;font-weight:700;
   padding:9px 14px;border-radius:16px 16px 16px 4px;max-width:min(260px,70%);box-shadow:0 10px 24px rgba(0,0,0,.35);animation:bub .25s ease-out}
 @keyframes bub{from{transform:scale(.7) translateY(-6px);opacity:0}to{transform:none;opacity:1}}
 
 .caps{display:flex;gap:6px;flex-wrap:wrap;align-items:center;min-height:42px}
 .grp{display:flex;align-items:center;background:rgba(0,0,0,.22);border-radius:var(--r-sm);padding:4px 8px 4px 5px}
-.grp .card{--w:22px;box-shadow:0 1px 3px rgba(0,0,0,.4)}
-.grp .card+.card{margin-left:-15px}
+.grp .card{--w:27px;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.grp .card+.card{margin-left:-19px}
 .grp .n{font-size:12px;font-weight:700;color:var(--muted);margin-left:6px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .caps .empty{font-size:12px;color:var(--faint)}
 
 .board{position:relative;flex:1;min-height:200px;border-radius:var(--r-lg);
   background:rgba(0,0,0,.28);border:1px solid var(--stroke);
-  display:flex;align-items:center;justify-content:center;padding:16px 10px 16px 78px}
-.field{display:flex;flex-wrap:wrap;gap:12px 14px;justify-content:center;align-content:center}
+  display:flex;align-items:center;gap:10px;padding:12px 10px}
+.field{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:10px 10px;justify-content:center;align-content:center}
 .stack{display:flex;position:relative}
 .stack .card{--w:var(--fw)}
 .stack .card+.card{margin-left:calc(var(--fw) * -.42)}
 .stack.spread .card+.card{margin-left:6px}
 .stack .ppk{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;z-index:5;white-space:nowrap}
-.deck{position:absolute;left:14px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
-.deck .card{--w:calc(var(--fw) * .92)}
+.deck{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;align-self:center}
+.deck .card{--w:calc(var(--fw) * .72)}
 .deck .n{font-size:11px;font-weight:700;color:var(--muted);background:var(--glass-2);border-radius:999px;padding:2px 8px;font-variant-numeric:tabular-nums}
 
 .msg{align-self:center;text-align:center;font-size:14px;font-weight:500;min-height:20px;color:var(--muted);padding:4px 14px;border-radius:999px}
@@ -175,8 +175,25 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--gold);outline-o
 .tick.warn{background:var(--accent);color:#fff;animation:pulse 1s infinite}
 .myav{width:30px;flex:none;border-radius:50%}
 
-.hand{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding-top:4px}
-@media (min-width:720px){ .hand{grid-template-columns:repeat(10,1fr)} .grp .card{--w:26px} .grp .card+.card{margin-left:-18px} }
+.hand{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding-top:4px}
+@media (min-width:720px){ :root{--fw:clamp(56px,9vw,88px)} .hand{grid-template-columns:repeat(10,1fr);gap:8px} .grp .card{--w:30px} .grp .card+.card{margin-left:-21px} }
+/* 휴대폰: 테두리와 여백을 줄여 패를 크게 */
+@media (max-width:480px){
+  .wrap{padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
+  #game{gap:8px;padding-block:6px 10px}
+  .side{padding:8px 10px;gap:6px;border-radius:18px}
+  .oppTop .pf{width:48px;height:48px}
+  .board{padding:10px 8px;gap:8px;border-radius:18px}
+  .caps{min-height:36px}
+  .grp{padding:3px 6px 3px 4px}
+  .who .score{font-size:20px;padding:5px 12px}
+  /* 손패 10장을 한 줄로 겹쳐 펼치기 */
+  #game .hand{display:flex;justify-content:center;padding-top:14px;padding-bottom:4px;--hw:min(78px,calc((100vw - 20px) / 5.1))}
+  #game .hand .card{width:var(--hw);flex:none}
+  #game .hand .card+.card{margin-left:min(4px,calc((100vw - 20px - var(--hw) * 10) / 9))}
+  #game .hand .card.match{transform:translateY(-12px)}
+}
+@media (max-width:480px) and (max-height:760px){ :root{--fw:clamp(48px,13vw,68px)} #game .hand{--hw:min(66px,calc((100vw - 20px) / 5.4))} .oppTop .pf{width:40px;height:40px} .caps{min-height:30px} .grp .card{--w:22px} .grp .card+.card{margin-left:-15px} }
 .hand .card{width:100%;cursor:pointer;transition:transform .16s,box-shadow .16s}
 .hand .card.match{transform:translateY(-8px);box-shadow:0 0 0 2.5px var(--mint),0 12px 20px rgba(0,0,0,.45)}
 .hand.locked .card{cursor:default;filter:brightness(.7) saturate(.85)}
@@ -408,10 +425,10 @@ function face(c){
   s+=`<rect x="2.5" y="77" width="55" height="12.5" rx="2" fill="${stripCol}"/><text x="30" y="86.6" font-size="${txt.length>5?7.6:9}" text-anchor="middle" fill="#fff" font-weight="700" font-family="Gowun Dodum,sans-serif">${txt}</text></svg>`;
   return FC[c.id]=s;
 }
-const BACK='<svg viewBox="0 0 60 92" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x=".6" y=".6" width="58.8" height="90.8" rx="5" fill="#a3141c" stroke="#5a0a0f"/><rect x="5" y="5" width="50" height="82" rx="3" fill="none" stroke="#f0b7a6" stroke-opacity=".5"/><path d="M30 18 L46 46 L30 74 L14 46Z" fill="none" stroke="#f0b7a6" stroke-opacity=".55" stroke-width="1.6"/><circle cx="30" cy="46" r="5" fill="#f0b7a6" fill-opacity=".45"/></svg>';
+const BACK='<img src="img/back.webp" alt="" draggable="false">';
 
 // 화투 그림 미리 불러오기
-(function(){ for(let m=1;m<=12;m++) for(let i=0;i<4;i++){ const im=new Image(); im.src=`img/c-${m}-${i}.webp`; } ['c-pass','b-2a','b-2b','b-3'].forEach(n=>{ const im=new Image(); im.src=`img/${n}.webp`; }); })();
+(function(){ for(let m=1;m<=12;m++) for(let i=0;i<4;i++){ const im=new Image(); im.src=`img/c-${m}-${i}.webp`; } ['c-pass','b-2a','b-2b','b-3','back'].forEach(n=>{ const im=new Image(); im.src=`img/${n}.webp`; }); })();
 /* ---------- 소리: 패 소리 / 화면 소리 / 캐릭터 목소리를 따로 ---------- */
 let AC=null, NB=null;
 function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } } if(AC.state==='suspended') AC.resume(); return AC; }
