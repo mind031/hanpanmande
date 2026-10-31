@@ -43,6 +43,7 @@ body[data-bg="green"]{--bgimg:url("img/bg-green.webp")}
 body[data-bg="room"]{--bgimg:url("img/bg-main.webp")}
 body[data-screen="home"]{--bgimg:url("img/bg-main.webp")}
 html,body{height:100%}
+body{overflow-x:hidden}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;letter-spacing:-.01em;
   -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;-webkit-font-smoothing:antialiased}
 body::before{content:"";position:fixed;inset:-60px;z-index:-1;background:var(--bgimg) center/cover no-repeat;
@@ -126,7 +127,7 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--gold);outline-o
 .av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 
 /* ---------- 게임 화면 ---------- */
-#game{display:flex;flex-direction:column;gap:10px;padding-block:10px 16px}
+#game{overflow-x:clip;display:flex;flex-direction:column;gap:10px;padding-block:10px 16px}
 .top{display:flex;align-items:center;gap:10px;height:44px}
 .brand{font-family:var(--f-logo);font-weight:800;font-size:20px;letter-spacing:-.03em;
   background:linear-gradient(180deg,#fff3cf,#f2c66d 50%,#c98f2c);-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -188,7 +189,17 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--gold);outline-o
 .myav{width:30px;flex:none;border-radius:50%}
 
 .hand{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding-top:4px}
-@media (min-width:720px){ :root{--fw:clamp(56px,9vw,88px)} .hand{grid-template-columns:repeat(10,1fr);gap:8px} .grp .card{--w:30px} .grp .card+.card{margin-left:-21px} }
+@media (min-width:720px){ :root{--fw:clamp(52px,min(9vw,10.5vh),88px)} #game .hand{max-width:calc(15vh * 10)} #game .hand{margin-inline:auto;width:100%} .hand{grid-template-columns:repeat(10,1fr);gap:8px} .grp .card{--w:30px} .grp .card+.card{margin-left:-21px} }
+/* 가로 화면(태블릿·PC): 위아래 칸을 한 줄로 납작하게 */
+@media (min-width:720px) and (orientation:landscape){
+  #game.wrap{max-width:1180px}
+  #game .side{flex-direction:row;align-items:center;flex-wrap:wrap;gap:14px}
+  #game .side .caps{flex:1;min-width:0}
+  #game .oppTop{flex:none;min-width:300px}
+  #game .side .who{order:-1;flex:none;min-width:220px}
+  #game .side .who .score{margin-left:12px}
+  #game .hand{width:min(100%,calc(10 * 11vh + 72px))}
+}
 /* 휴대폰: 테두리와 여백을 줄여 패를 크게 */
 @media (max-width:480px){
   .wrap{padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
@@ -200,12 +211,12 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--gold);outline-o
   .grp{padding:3px 6px 3px 4px}
   .who .score{font-size:20px;padding:5px 12px}
   /* 손패 10장을 한 줄로 겹쳐 펼치기 */
-  #game .hand{display:flex;justify-content:center;padding-top:14px;padding-bottom:4px;--hw:min(78px,calc((100vw - 20px) / 5.1))}
-  #game .hand .card{width:var(--hw);flex:none}
-  #game .hand .card+.card{margin-left:min(4px,calc((100vw - 20px - var(--hw) * 10) / 9))}
+  #game .hand{display:flex;justify-content:center;padding-top:14px;padding-bottom:4px}
+  #game .hand .card{width:var(--hw,64px);flex:none}
+  #game .hand .card+.card{margin-left:var(--ho,-30px)}
   #game .hand .card.match{transform:translateY(-12px)}
 }
-@media (max-width:480px) and (max-height:760px){ :root{--fw:clamp(48px,13vw,68px)} #game .hand{--hw:min(66px,calc((100vw - 20px) / 5.4))} .oppTop .pf{width:40px;height:40px} .caps{min-height:30px} .grp .card{--w:22px} .grp .card+.card{margin-left:-15px} }
+@media (max-width:480px) and (max-height:760px){ :root{--fw:clamp(46px,12.5vw,64px)} .board{min-height:170px} .top{height:38px} #game{gap:6px} .oppTop .pf{width:40px;height:40px} .caps{min-height:30px} .grp .card{--w:22px} .grp .card+.card{margin-left:-15px} }
 .hand .card{width:100%;cursor:pointer;transition:transform .16s,box-shadow .16s}
 .hand .card.match{transform:translateY(-8px);box-shadow:0 0 0 2.5px var(--mint),0 12px 20px rgba(0,0,0,.45)}
 .hand.locked .card{cursor:default;filter:brightness(.7) saturate(.85)}
@@ -226,6 +237,10 @@ button:focus-visible,.card:focus-visible{outline:2px solid var(--gold);outline-o
 #fx span.small{font-family:var(--f-body);font-size:clamp(26px,7.5vw,44px);font-weight:800;background:none;color:#fff;-webkit-background-clip:initial;background-clip:initial}
 @keyframes pop{0%{transform:scale(.4);opacity:0}25%{transform:scale(1.08);opacity:1}70%{transform:scale(1);opacity:1}100%{transform:translateY(-18px);opacity:0}}
 
+#lostBar{position:fixed;left:0;right:0;top:0;z-index:60;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));
+  background:var(--accent);color:#fff;font-size:14px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+#lostBar .lb-b{background:rgba(0,0,0,.22);border:0;border-radius:999px;padding:6px 12px;color:#fff;font-weight:700;cursor:pointer}
 /* ---------- 창 ---------- */
 #modal{position:fixed;inset:0;background:rgba(5,6,8,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:grid;place-items:center;z-index:50;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px}
@@ -664,7 +679,7 @@ function onNet(o){
     if(o.type==='ask'&&o.kind==='go'){ if(S) S.deadline=o.left?Date.now()+o.left:0; askGo(o.sc).then(v=>netSend({type:'go',v,seq:o.seq})); return; }
     if(o.type==='timeout'){ closeModal(); if(S){ S.picking=null; pickResolve=null; } return; }
     if(o.type==='result') return guestResult(o);
-    if(o.type==='nagari') return guestNagari(o);
+    if(o.type==='nagari'){ if(S&&S.resultShown===o.gid) return; if(S) S.resultShown=o.gid; return guestNagari(o); }
   } else if(NET.role==='host'){
     if(o.type==='again'){ NET.againOpp=true; if(NET.againMe) startOnline(); return; }
     const w=NET.waiters[o.type]; if(w){ delete NET.waiters[o.type]; w(o); }
@@ -673,6 +688,7 @@ function onNet(o){
 /* 연결이 끊겼을 때: 방장은 60초 기다리고, 손님은 60초 동안 다시 붙어 보기 */
 const LOST_MS=60000;
 function endOnline(msg){
+  hideLost();
   if(!NET.role&&!NET.lost) return;
   if(S){ S.aborted=true; S.over=true; }
   netReset();
@@ -684,24 +700,30 @@ function onConnLost(conn){
   if(NET.role==='host') return hostWaitBack();
   guestReconnect();
 }
+function lostBanner(text,btn,onBtn){
+  let el=$('#lostBar'); if(!el){ el=document.createElement('div'); el.id='lostBar'; document.body.appendChild(el); }
+  el.innerHTML=`<span class="lb-t">${text}</span><button type="button" class="lb-b">${btn}</button>`; el.hidden=false;
+  el.querySelector('.lb-b').onclick=onBtn; return el;
+}
+function hideLost(){ const el=$('#lostBar'); if(el) el.hidden=true; }
 function hostWaitBack(){
   const until=Date.now()+LOST_MS;
-  modal('상대 연결이 끊겼어요',`<p>${esc(NET.opp?NET.opp.name:'상대')} 님이 다시 들어오기를 기다리는 중이에요.</p><p class="note" id="lostNote">60초 동안 기다려요.</p>`,[{t:'그만 기다리기',v:'out'}]).then(v=>{ if(v==='out'&&NET.lost) endOnline('게임을 끝냈어요.'); });
+  const bar=lostBanner(`${esc(NET.opp?NET.opp.name:'상대')} 님 연결이 끊겼어요. 기다리는 중…`,'그만 기다리기',()=>{ if(NET.lost) endOnline('게임을 끝냈어요.'); });
   clearInterval(NET.lostTimer);
-  NET.lostTimer=setInterval(()=>{ if(!NET.lost){ clearInterval(NET.lostTimer); return; }
-    const s=Math.ceil((until-Date.now())/1000); const n=$('#lostNote'); if(n) n.textContent=`${Math.max(0,s)}초 더 기다려요.`;
-    if(s<=0){ clearInterval(NET.lostTimer); endOnline('상대가 돌아오지 않아서 게임이 끝났어요.'); } },500);
+  NET.lostTimer=setInterval(()=>{ if(!NET.lost){ clearInterval(NET.lostTimer); hideLost(); return; }
+    const sec=Math.ceil((until-Date.now())/1000); const t=bar.querySelector('.lb-t'); if(t) t.textContent=`${NET.opp?NET.opp.name:'상대'} 님 연결이 끊겼어요. ${Math.max(0,sec)}초 기다려요`;
+    if(sec<=0){ clearInterval(NET.lostTimer); endOnline('상대가 돌아오지 않아서 게임이 끝났어요.'); } },500);
 }
 async function guestReconnect(){
   const until=Date.now()+LOST_MS;
-  modal('연결이 끊겼어요','<p>다시 연결하는 중이에요…</p><p class="note">화면을 끄지 말고 잠깐만 기다려 주세요.</p>',[{t:'나가기',v:'out'}]).then(v=>{ if(v==='out'&&NET.lost) endOnline('게임을 끝냈어요.'); });
+  lostBanner('연결이 끊겼어요. 다시 연결하는 중…','나가기',()=>{ if(NET.lost) endOnline('게임을 끝냈어요.'); });
   while(NET.lost&&Date.now()<until){
     try{
       let p=NET.peer;
       if(!p||p.destroyed){ p=await newPeer(); NET.peer=p; }
       else if(p.disconnected){ try{ p.reconnect(); }catch(e){} await sleep(1500); }
       const conn=await tryConnect(p,NET.hostId,5000);
-      if(conn&&NET.lost){ NET.lost=false; wireConn(conn,'guest'); conn.send({type:'rejoin',token:NET.token}); closeModal(); return; }
+      if(conn&&NET.lost){ NET.lost=false; hideLost(); wireConn(conn,'guest'); conn.send({type:'rejoin',token:NET.token}); return; }
     }catch(e){}
     await sleep(2000);
   }
@@ -727,7 +749,7 @@ async function startOnline(){
   render({stagger:35}); sfx('deal');
   setMsg(S.turn===0?'내가 먼저 쳐요.':`${esc(NET.opp.name)} 님이 먼저 쳐요.`);
   await sleep(1400);
-  for(const p of [0,1]){
+  for(const p of [S.turn,1-S.turn]){
     const cnt={}; S.hands[p].forEach(c=>{ if(!c.bonus) cnt[c.m]=(cnt[c.m]||0)+1; });
     const m=Object.keys(cnt).find(k=>cnt[k]===4);
     if(m){ await flash('총통!','bomb'); return settle(p,{pts:10,name:`총통 (${m}월 4장)`}); }
@@ -740,8 +762,8 @@ async function remoteTurn(){
   for(;;){
     const o=await netWaitFor('play',S.deadline-Date.now()); if(S.over||S.aborted) return;
     if(!o){ S.awaitGuest=null; netSend({type:'timeout'}); return play(1,autoCard(1),{}); }
-    if(o.seq!==S.seq) continue;
-    const card=S.hands[1].find(c=>c.id===o.id); if(!card) continue;
+    if(o.seq!==S.seq){ sendView(); continue; }
+    const card=S.hands[1].find(c=>c.id===o.id); if(!card){ sendView(); continue; }
     const opt={}; const same=S.hands[1].filter(x=>x.m===card.m).length, f=fieldOf(card.m).length;
     if(o.opt&&o.opt.bomb&&!card.bonus&&!card.dummy&&same===3&&f===1) opt.bomb=true;
     if(o.opt&&o.opt.shake&&!card.bonus&&!card.dummy&&same===3&&f===0) opt.shake=true;
@@ -817,7 +839,7 @@ function hostListen(peer){
     conn.on('open',()=>{
       if(NET.role==='host'&&NET.lost){
         conn.send({type:'welcome'});
-        conn.on('data',function rj(d){ if(d&&d.type==='rejoin'&&d.token&&d.token===NET.oppToken&&NET.lost){ conn.off('data',rj); NET.lost=false; clearInterval(NET.lostTimer); wireConn(conn,'host'); closeModal(); hostResync(); } });
+        conn.on('data',function rj(d){ if(d&&d.type==='rejoin'&&d.token&&d.token===NET.oppToken&&NET.lost){ conn.off('data',rj); NET.lost=false; clearInterval(NET.lostTimer); hideLost(); wireConn(conn,'host'); hostResync(); } });
         setTimeout(()=>{ if(NET.conn!==conn) try{conn.close();}catch(e){} },8000);
         return;
       }
@@ -1033,6 +1055,10 @@ function render(opt={}){
     if(myTurn&&!c.dummy&&(c.bonus||fieldOf(c.m).length)) el.classList.add('match');
     el.onclick=()=>onHumanCard(c); el.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); onHumanCard(c); } };
     hd.appendChild(el); });
+  // 휴대폰: 손패를 한 줄에 딱 맞게 겹쳐 펼치기
+  if(matchMedia('(max-width:480px)').matches){ const W0=hd.clientWidth, n=Math.max(1,S.hands[0].length), small=innerHeight<760;
+    const w=Math.min(small?64:78, W0/(small?5.4:5.1)); const o=n>1?Math.min(4,(W0-w*n)/(n-1)):0;
+    hd.style.setProperty('--hw',w+'px'); hd.style.setProperty('--ho',o+'px'); }
 
   // 날아가는 모션: 전에 있던 자리(또는 더미·상대 손)에서 새 자리로
   if(reduceMotion||opt.still){ S.from.clear(); return; }
@@ -1137,11 +1163,11 @@ async function play(p,card,opt={}){
     rm(hand,card); S.caps[p].push(card); render(); sfx('take'); await sleep(450); await flash('보너스!','bonus',true);
     if(S.deck.length){ const d=S.deck.pop(); S.from.set(d.id,p===0?'deck':'none'); hand.push(d); if(p===0) sortHand(); }
     render();
-    if(!hand.length){ S.turn=opp; }
+    if(!hand.length){ const sc=score(S.caps[p]).total; if(sc>=7&&sc>S.goScore[p]){ await flash('스톱!','go'); return settle(p); } S.turn=opp; }
     return nextTurn();
   }
   const taken=[]; let steal=0; const fx=[]; let P=null, pre=[], k=0;
-  const eatPile=m=>{ const self=S.ppeok[m]===p; delete S.ppeok[m]; steal+=self?2:1; fx.push(self?['자뻑!','ttadak']:['뻑 먹기!','ttadak']); };
+  const eatPile=m=>{ if(S.ppeok[m]==null) return; const self=S.ppeok[m]===p; delete S.ppeok[m]; steal+=self?2:1; fx.push(self?['자뻑!','ttadak']:['뻑 먹기!','ttadak']); };
   if(card.dummy){ rm(hand,card); setMsg(who+'한 장 뒤집기'); }
   else if(opt.bomb){
     const three=hand.filter(c=>c.m===card.m); const f=fieldOf(card.m); three.forEach(c=>{ rm(hand,c); S.field.push(c); S.from.set(c.id,p===1?'opp':'me'); });
@@ -1226,19 +1252,24 @@ async function onHumanCard(c){
 async function settle(w,special){
   if(S.aborted) return;
   S.over=true; S.busy=true; render();
-  const l=1-w, s=score(S.caps[w]);
+  const l=1-w;
   let lines=[], base, mult=1;
   if(special){ base=special.pts; lines.push([special.name,special.pts+'점']); }
   else {
-    s.parts.forEach(([a,b])=>lines.push([a,b+'점'])); base=s.total;
-    const g=S.go[w];
-    if(g===1){ base+=1; lines.push(['1고','+1점']); } else if(g===2){ base+=2; lines.push(['2고','+2점']); }
-    else if(g>=3){ base=(s.total+2)*2**(g-2); lines.push([g+'고',`+2점 후 ×${2**(g-2)}`]); }
-    const mul=(on,name)=>{ if(on){ mult*=2; lines.push([name,'×2']); } };
-    for(let i=0;i<S.shake[w];i++) mul(true,'흔들기');
-    for(let i=0;i<S.bomb[w];i++) mul(true,'폭탄');
+    // 국진(9월 열끗)은 열끗·쌍피 중 이긴 사람에게 더 많이 받는 쪽으로
     const lpi=Math.max(calc(S.caps[l],false).pi,calc(S.caps[l],true).pi), lg=S.caps[l].filter(c=>c.t==='gwang').length;
-    mul(s.piPts&&lpi<=5,'피박'); mul(s.gwPts&&lg===0,'광박'); mul(s.y>=7,'멍박'); mul(S.go[l]>0,'고박');
+    const evalWin=kook=>{ const s=calc(S.caps[w],kook), ls=[]; let b=s.total, m=1;
+      s.parts.forEach(([a,x])=>ls.push([a,x+'점']));
+      const g=S.go[w];
+      if(g===1){ b+=1; ls.push(['1고','+1점']); } else if(g===2){ b+=2; ls.push(['2고','+2점']); }
+      else if(g>=3){ b=(s.total+g)*2**(g-2); ls.push([g+'고',`+${g}점 후 ×${2**(g-2)}`]); }
+      const mul=(on,name)=>{ if(on){ m*=2; ls.push([name,'×2']); } };
+      for(let i=0;i<S.shake[w];i++) mul(true,'흔들기');
+      for(let i=0;i<S.bomb[w];i++) mul(true,'폭탄');
+      mul(s.piPts&&lpi>=1&&lpi<=5,'피박'); mul(s.gwPts&&lg===0,'광박'); mul(s.y>=7,'멍박'); mul(S.go[l]>0,'고박');
+      return {b,m,ls}; };
+    const A=evalWin(false), B=evalWin(true), best=B.b*B.m>A.b*A.m?B:A;
+    base=best.b; mult=best.m; lines=best.ls;
   }
   const carry=online()?NET.carry:store.carry;
   if(carry>1){ mult*=carry; lines.push(['나가리 판','×'+carry]); }
@@ -1267,8 +1298,11 @@ async function settle(w,special){
 }
 async function hostSettle(w,lines,pts,won){
   NET.carry=1; NET.starter=w;
-  NET.lastResult={type:'result',w,pts,won,lines,gid:S.gid}; netSend(NET.lastResult);
-  let delta; if(w===0){ delta=won; store.money+=won; store.wins++; } else { delta=-Math.min(won,store.money); store.money+=delta; store.losses++; }
+  // 진 사람이 가진 만큼만 오가요
+  const paid=w===0?Math.min(won,Math.max(0,NET.opp.money)):Math.min(won,store.money);
+  NET.lastResult={type:'result',w,pts,won:paid,lines,gid:S.gid}; netSend(NET.lastResult);
+  NET.opp.money+=w===0?-paid:paid;
+  let delta; if(w===0){ delta=paid; store.money+=paid; store.wins++; } else { delta=-paid; store.money-=paid; store.losses++; }
   store.best=Math.max(store.best,store.money); save(); render();
   sfx(w===0?'win':'lose'); setMsg(w===0?'<b>이겼어요!</b>':`${esc(NET.opp.name)} 님이 났어요.`);
   await modal(w===0?'이겼어요!':'졌어요',resultBody(lines,pts,delta),[{t:'확인',v:1,cls:'gold'}]);
@@ -1276,7 +1310,7 @@ async function hostSettle(w,lines,pts,won){
 }
 async function nagari(){
   if(S.aborted) return;
-  if(online()){ S.over=true; NET.carry=Math.min(NET.carry*2,8); netSend({type:'nagari',carry:NET.carry}); render(); await flash('나가리','lose');
+  if(online()){ S.over=true; NET.carry=Math.min(NET.carry*2,8); NET.lastResult={type:'nagari',carry:NET.carry,gid:S.gid}; netSend(NET.lastResult); render(); await flash('나가리','lose');
     await modal('나가리',`<p>아무도 못 났어요. 다음 판은 점수가 <b>×${NET.carry}</b>예요!</p>`,[{t:'확인',v:1,cls:'gold'}]); if(NET.role) hostAfter(); return; }
   S.over=true; store.carry=Math.min(store.carry*2,8); save(); render(); setMsg('나가리');
   await flash('나가리','lose');
@@ -1297,7 +1331,7 @@ async function start(){
   const ch=CH[store.level];
   setMsg(S.turn===0?'내가 먼저 쳐요.':`${ch.name}${iga(ch.name)} 먼저 쳐요.`);
   await sleep(900); say('start','h');
-  for(const p of [0,1]){
+  for(const p of [S.turn,1-S.turn]){
     const cnt={}; S.hands[p].forEach(c=>{ if(!c.bonus) cnt[c.m]=(cnt[c.m]||0)+1; });
     const m=Object.keys(cnt).find(k=>cnt[k]===4);
     if(m){ await sleep(500); await flash('총통!','bomb'); return settle(p,{pts:10,name:`총통 (${m}월 4장)`}); }

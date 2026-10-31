@@ -1,5 +1,5 @@
 // 홈 화면 앱용: 그림은 저장해 두고, 화면 파일은 늘 새로 받아요
-const V='hanpan-v2';
+const V='hanpan-v3';
 self.addEventListener('install',e=>self.skipWaiting());
 self.addEventListener('activate',e=>e.waitUntil(clients.claim()));
 self.addEventListener('fetch',e=>{
