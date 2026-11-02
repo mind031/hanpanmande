@@ -612,8 +612,8 @@ function modal(title,body,btns){
 }
 
 /* 흔들기: 같은 달 3장을 잠깐 펼쳐 보여주기 */
-function reveal(cards,label){
-  if(typeof NET!=='undefined'&&NET.role==='host') netSend({type:'reveal',ids:cards.map(c=>c.id),label});
+function reveal(cards,label,who){
+  if(typeof NET!=='undefined'&&NET.role==='host') netSend({type:'reveal',ids:cards.map(c=>c.id),who});
   const box=document.createElement('div'); box.className='reveal';
   box.innerHTML=`<div class="rv-t">${label}</div><div class="rv-c"></div>`;
   cards.forEach(c=>box.querySelector('.rv-c').appendChild(cardEl(c)));
@@ -632,6 +632,8 @@ function saveReplay(result){
   store.replay={log:S.log,opp:online()?NET.opp.name:CH[store.level].name,oppAv:online()?NET.opp.av:null,lv:store.level,result,rules:S.rules,at:Date.now()};
   save();
 }
+/* 시간 제한: 제때 고르면 타이머는 아무것도 안 해요 */
+function timed(p,ms,onTimeout){ let done=false; return Promise.race([p.then(v=>{ done=true; return v; }),sleep(ms).then(()=>done?undefined:(done=true,onTimeout()))]); }
 /* ---------- 점수 ---------- */
 function calc(caps,kookAsPi){
   let g=0,bi=false,y=0,birds=0,t=0,hong=0,cheong=0,cho=0,pi=0;
@@ -728,7 +730,7 @@ function onNet(o){
     if(o.type==='view') return applyView(o);
     if(o.type==='fx'){ flash(o.alt||o.text,o.sound,o.small); return; }
     if(o.type==='sfx'){ sfx(o.k); return; }
-    if(o.type==='reveal'){ reveal((o.ids||[]).map(cardOf),String(o.label||'흔들기!').startsWith('내가')?`${esc(NET.opp.name)} 님이 흔들었어요!`:'내가 흔들었어요!'); return; }
+    if(o.type==='reveal'){ reveal((o.ids||[]).map(cardOf),o.who===1?'내가 흔들었어요!':`${esc(NET.opp.name)} 님이 흔들었어요!`); return; }
     if(o.type==='ask'&&o.kind==='go'){ if(S) S.deadline=o.left?Date.now()+o.left:0; askGo(o.sc).then(v=>netSend({type:'go',v,seq:o.seq})); return; }
     if(o.type==='ask'&&o.kind==='kook'){ if(S) S.deadline=o.left?Date.now()+o.left:0; askKook(0).then(v=>netSend({type:'kook',v,seq:o.seq})); return; }
     if(o.type==='timeout'){ closeModal(); if(S){ S.picking=null; pickResolve=null; } return; }
@@ -934,7 +936,7 @@ async function quickMatch(){
       if(NET.role||job.cancelled) return;
       const v=await modal('아직 상대가 없어요','<p>지금 들어온 사람이 없네요. 컴퓨터랑 먼저 칠까요? 계속 기다려도 돼요.</p>',[{t:'컴퓨터랑 하기',v:'ai',cls:'red'},{t:'계속 기다리기',v:'wait'},{t:'그만 찾기',v:'cancel'}]);
       if(NET.role) return;
-      if(v==='ai'){ cancelSearch(); start(); } else if(v==='cancel'){ cancelSearch(); } else waitBox();
+      if(v==='ai'){ cancelSearch(); const ok=[store.level,1,2,3,4,5].find(n=>!allIn(n)&&canEnter(n)); if(!ok) return modal('칠 수 있는 컴퓨터가 없어요','<p>오늘은 컴퓨터 상대가 모두 올인했거나 아직 잠겨 있어요. 내일 다시 와 주세요.</p>',[{t:'확인',v:1,cls:'gold'}]).then(home); store.level=ok; save(); start(); } else if(v==='cancel'){ cancelSearch(); } else waitBox();
     },30000);
   }catch(e){
     if(job.cancelled) return;
@@ -1235,7 +1237,7 @@ function choose(p,cands){
 }
 function humanPick(cands){
   if(NET.role==='host'){ setDeadline(TURN_MS); const pr=new Promise(res=>{ S.picking=cands; pickResolve=res; setMsg(`<b>${cands[0].m}월</b> 패가 두 장이에요. 먹을 패를 누르세요.`); render(); });
-    return Promise.race([pr,sleep(TURN_MS).then(()=>cands[0])]).then(c=>{ S.picking=null; pickResolve=null; setDeadline(0); return c; }); }
+    return timed(pr,TURN_MS,()=>cands[0]).then(c=>{ S.picking=null; pickResolve=null; setDeadline(0); return c; }); }
   return new Promise(res=>{ S.picking=cands; pickResolve=res; setMsg(`<b>${cands[0].m}월</b> 패가 두 장이에요. 먹을 패를 누르세요.`); render(); });
 }
 function askGo(sc){
@@ -1244,7 +1246,7 @@ function askGo(sc){
     [{t:'고!',v:true,cls:'red'},{t:'스톱',v:false,cls:'gold'}]);
 }
 
-function hostAskGo(sc){ setDeadline(TURN_MS); render(); return Promise.race([askGo(sc),sleep(TURN_MS).then(()=>{ closeModal(); return false; })]).then(v=>{ setDeadline(0); return v; }); }
+function hostAskGo(sc){ setDeadline(TURN_MS); render(); return timed(askGo(sc),TURN_MS,()=>{ closeModal(); return false; }).then(v=>{ setDeadline(0); return v; }); }
 /* 국진: 가져갈 때 열끗으로 쓸지 쌍피로 쓸지 고르기 */
 function aiKook(p){ const y=calc(S.caps[p],false), q=calc(S.caps[p],true);
   if(q.total!==y.total) return q.total>y.total?'pi':'yeol';
@@ -1258,7 +1260,7 @@ function askKook(p){
 }
 async function chooseKook(p){
   let v;
-  if(p===0&&NET.role!=='guest') v=NET.role==='host'?await Promise.race([askKook(0),sleep(TURN_MS).then(()=>{ closeModal(); return aiKook(0); })]):await askKook(0);
+  if(p===0&&NET.role!=='guest') v=NET.role==='host'?await timed(askKook(0),TURN_MS,()=>{ closeModal(); return aiKook(0); }):await askKook(0);
   else if(p===1&&NET.role==='host') v=await remoteKook();
   else v=aiKook(p);
   S.kookAs=v==='pi'?'pi':'yeol'; render();
@@ -1266,8 +1268,8 @@ async function chooseKook(p){
 }
 /* ---------- 한 수 진행 ---------- */
 function stealPi(from,to){
-  const pis=S.caps[from].filter(c=>c.t==='pi'); if(!pis.length) return false;
-  pis.sort((a,b)=>(a.v-b.v)||((a.bonus?1:0)-(b.bonus?1:0)));
+  const pis=S.caps[from].filter(c=>c.t==='pi'||(c.kook&&kookPi())); if(!pis.length) return false;
+  const pv=c=>c.kook?2:c.v; pis.sort((a,b)=>(pv(a)-pv(b))||((a.bonus?1:0)-(b.bonus?1:0))||((a.kook?1:0)-(b.kook?1:0)));
   rm(S.caps[from],pis[0]); S.caps[to].push(pis[0]); return true;
 }
 async function takeCards(cards){
@@ -1280,7 +1282,7 @@ async function play(p,card,opt={}){
   const hand=S.hands[p], opp=1-p, who=p===0?'':'컴퓨터: ';
   if(card.bonus){
     S.from.set(card.id,p===1?'opp':'me');
-    rm(hand,card); S.caps[p].push(card); render(); sfx('take'); await sleep(450); await flash('보너스!','bonus',true);
+    rm(hand,card); S.caps[p].push(card); render(); sfx('take'); logSnap(`${p===0?'나':(online()?NET.opp.name:CH[store.level].name)}: 보너스 패`); await sleep(450); await flash('보너스!','bonus',true);
     if(S.deck.length){ const d=S.deck.pop(); S.from.set(d.id,p===0?'deck':'none'); hand.push(d); if(p===0) sortHand(); }
     render();
     if(!hand.length){ const sc=score(S.caps[p]).total; if(sc>=7&&sc>S.goScore[p]){ await flash('스톱!','go'); return settle(p); } S.turn=opp; }
@@ -1294,7 +1296,7 @@ async function play(p,card,opt={}){
     render(); await sleep(450); await flash('폭탄!','bomb'); if(p===1) say('special','h');
     taken.push(...three,...f); steal++; S.bomb[p]++; hand.push(dummy(),dummy()); if(p===0) sortHand();
   } else {
-    if(opt.shake){ S.shake[p]++; render(); sfx('shake'); await reveal(hand.filter(x=>x.m===card.m),`${p===0?'내가':(online()?esc(NET.opp.name)+' 님이':CH[store.level].name+iga(CH[store.level].name))} 흔들었어요!`); }
+    if(opt.shake){ S.shake[p]++; render(); sfx('shake'); await reveal(hand.filter(x=>x.m===card.m),`${p===0?'내가':(online()?esc(NET.opp.name)+' 님이':CH[store.level].name+iga(CH[store.level].name))} 흔들었어요!`,p); }
     pre=fieldOf(card.m); k=pre.length; rm(hand,card); S.field.push(card); P=card; S.from.set(card.id,p===1?'opp':'me');
     render(); await sleep(260); sfx(k?'hit':'tap'); await sleep(320);
   }
@@ -1424,7 +1426,7 @@ async function hostSettle(w,lines,pts,won){
   // 진 사람이 가진 만큼만 오가요
   const paid=w===0?Math.min(won,Math.max(0,NET.opp.money)):Math.min(won,store.money);
   NET.lastResult={type:'result',w,pts,won:paid,lines,gid:S.gid}; netSend(NET.lastResult);
-  NET.opp.money+=w===0?-paid:paid;
+  NET.opp.money+=w===0?-paid:paid; saveReplay(w===0?`이겼어요 +${fmt(paid)}냥`:`졌어요 -${fmt(paid)}냥`);
   let delta; if(w===0){ delta=paid; store.money+=paid; store.wins++; } else { delta=-paid; store.money-=paid; store.losses++; }
   store.best=Math.max(store.best,store.money); save(); render();
   sfx(w===0?'win':'lose'); setMsg(w===0?'<b>이겼어요!</b>':`${esc(NET.opp.name)} 님이 났어요.`);
@@ -1433,7 +1435,7 @@ async function hostSettle(w,lines,pts,won){
 }
 async function nagari(){
   if(S.aborted) return;
-  if(online()){ S.over=true; NET.carry=rule('nagari')?Math.min(NET.carry*2,8):1; NET.lastResult={type:'nagari',carry:NET.carry,gid:S.gid}; netSend(NET.lastResult); render(); await flash('나가리','lose');
+  if(online()){ S.over=true; NET.carry=rule('nagari')?Math.min(NET.carry*2,8):1; NET.lastResult={type:'nagari',carry:NET.carry,gid:S.gid}; netSend(NET.lastResult); saveReplay('나가리'); save(); render(); await flash('나가리','lose');
     await modal('나가리',`<p>아무도 못 났어요. ${NET.carry>1?`다음 판은 점수가 <b>×${NET.carry}</b>예요!`:'다음 판을 새로 시작해요.'}</p>`,[{t:'확인',v:1,cls:'gold'}]); if(NET.role) hostAfter(); return; }
   S.over=true; store.carry=rule('nagari')?Math.min(store.carry*2,8):1; saveReplay('나가리'); save(); render(); setMsg('나가리');
   await flash('나가리','lose');
@@ -1487,19 +1489,20 @@ function renderHome(){
   $('#homeMoney').innerHTML=`내 돈 <b>${fmt(store.money)}</b>냥`;
   $('#homeRec').textContent=`${store.wins}승 ${store.losses}패`;
   const playable=n=>!allIn(n)&&canEnter(n);
-  if(!playable(store.level)){ const ok=[5,4,3,2,1].find(playable); if(ok) store.level=ok; }
-  $('#chars').innerHTML=[1,2,3,4,5].map(n=>{ const c=CH[n], m=aiMoney(n), out=m<=0, lock=!out&&!canEnter(n), pct=Math.max(0,Math.round(m/AI_LIMIT[n]*100));
+  if(!playable(store.level)){ const L0=store.level; const ok=[L0-1,L0-2,L0-3,L0-4,L0+1,L0+2,L0+3,L0+4].find(n=>n>=1&&n<=5&&playable(n)); if(ok){ store.level=ok; save(); } }
+  $('#chars').innerHTML=[1,2,3,4,5].map(n=>{ const c=CH[n], m=aiMoney(n), out=m<=0, lock=!out&&!canEnter(n), pct=Math.min(100,Math.max(0,Math.round(m/AI_LIMIT[n]*100)));
     return `<button type="button" class="char ${store.level===n&&!out&&!lock?'on':''} ${out||lock?'out':''}" data-lv="${n}" aria-pressed="${store.level===n}" ${out?'aria-disabled="true"':''}>
       <span class="pf">${portrait(n,out?'s':store.level===n?'h':'n')}</span>
       <span class="t"><span class="nm">${c.name}</span><span class="lv">${c.lv}</span><br><span class="stars">${'★'.repeat(n)}${'☆'.repeat(5-n)}</span><div class="ds">${c.desc}</div><div class="stake">점당 <b>${fmt(STAKE[n])}냥</b>${ENTRY[n]?` · ${fmt(ENTRY[n])}냥부터 입장`:''}</div>
       <span class="wallet">${out?'<b class="oi">올인</b> 내일 다시 와요':lock?`<b class="lk">잠김</b> 내 돈 ${fmt(ENTRY[n])}냥이 되면 열려요`:`<span class="bar"><i style="width:${pct}%"></i></span><span class="wm">${fmt(m)} / ${fmt(AI_LIMIT[n])}냥</span>`}</span></span></button>`; }).join('');
-  const allOut=![1,2,3,4,5].some(playable); $('#startBtn').disabled=allOut; $('#startBtn').textContent=allOut?(store.money<ENTRY[2]&&!allIn(1)?'칠 수 있는 상대가 없어요':'오늘은 모두 올인! 내일 만나요'):'컴퓨터랑 한 판';
+  const allOut=![1,2,3,4,5].some(playable); $('#startBtn').disabled=allOut; $('#startBtn').textContent=allOut?([1,2,3,4,5].every(allIn)?'오늘은 모두 올인! 내일 만나요':'지금 칠 수 있는 상대가 없어요'):'컴퓨터랑 한 판';
   wireBgPick($('#bgPickHome'));
   $('#replayBtn').hidden=!(store.replay&&store.replay.log&&store.replay.log.length);
   document.querySelectorAll('[data-snd]').forEach(b=>b.classList.toggle('on',(b.dataset.snd==='1')===store.sound));
   if(store.carry>1){ $('#homeNote').hidden=false; $('#homeNote').textContent=`지난 판이 나가리라 이번 판은 ×${store.carry}`; }
 }
 function home(){
+  endReplay();
   showScreen('home');
   const refilled=dailyRefill();
   $('#homeNote').hidden=!refilled; if(refilled) $('#homeNote').textContent='오늘의 충전! 5만 냥까지 채워 드렸어요.';
@@ -1521,27 +1524,29 @@ async function editRules(){
   const cur=Object.assign({},RULE_DEF,store.rules||{});
   const body=()=>`<p class="note">컴퓨터랑 칠 때와, 친구랑 할 때 방장 쪽 규칙으로 쳐요.</p><div class="rset">${RULES_UI.map(([k,t,d,opts])=>`<div class="rrow"><span class="rl">${t}<small>${d}</small></span><span class="rchips">${opts.map(([v,l],i)=>`<button type="button" class="rchip ${cur[k]===v?'on':''}" data-rk="${k}" data-ri="${i}">${l}</button>`).join('')}</span></div>`).join('')}</div>`;
   const p=modal('규칙 설정',body(),[{t:'저장',v:'save',cls:'red'},{t:'기본값으로',v:'reset'}]);
-  $('#sheet').addEventListener('click',e=>{ const b=e.target.closest('[data-rk]'); if(!b) return; sfx('ui'); const k=b.dataset.rk, opt=RULES_UI.find(r=>r[0]===k)[3][+b.dataset.ri]; cur[k]=opt[0];
+  $('#sheet').onclick=(e=>{ const b=e.target.closest('[data-rk]'); if(!b) return; sfx('ui'); const k=b.dataset.rk, opt=RULES_UI.find(r=>r[0]===k)[3][+b.dataset.ri]; cur[k]=opt[0];
     b.parentNode.querySelectorAll('.rchip').forEach(x=>x.classList.toggle('on',x===b)); });
-  const v=await p;
+  const v=await p; $('#sheet').onclick=null;
   store.rules=v==='reset'?{}:cur; save();
 }
 // 지난 판 다시 보기
+function endReplay(){ const bar=$('#replayBar'); if(bar) bar.hidden=true; document.body.classList.remove('replaying'); $('#menuBtn').hidden=false; }
 function showReplay(){
   const R=store.replay; if(!R||!R.log||!R.log.length) return;
   const CAT=Object.fromEntries(build().map(c=>[c.id,c])); const C=i=>CAT[i];
   let i=0;
   document.body.classList.add('replaying'); showScreen('game'); $('#bubble').hidden=true;
   let bar=$('#replayBar'); if(!bar){ bar=document.createElement('div'); bar.id='replayBar'; document.body.appendChild(bar); }
-  bar.hidden=false;
+  bar.hidden=false; $('#menuBtn').hidden=true;
+  const D=[0,1,2,3].map(()=>dummy());
   bar.innerHTML='<span class="rp-s" id="rpS"></span><button type="button" data-rp="first" aria-label="처음">⏮</button><button type="button" data-rp="prev" aria-label="이전">◀</button><button type="button" data-rp="next" aria-label="다음">▶</button><button type="button" data-rp="last" aria-label="끝">⏭</button><button type="button" class="rp-x" data-rp="close">닫기</button>';
   const draw=()=>{ const s=R.log[i];
-    S={replay:true,rules:R.rules,hands:[[...s.h0.map(C),...Array.from({length:s.dum[0]},dummy)],[...s.h1.map(C),...Array.from({length:s.dum[1]},dummy)]],field:s.f.map(C),deck:{length:s.d},caps:[s.c0.map(C),s.c1.map(C)],
+    S={replay:true,rules:R.rules,hands:[[...s.h0.map(C),...D.slice(0,s.dum[0])],[...s.h1.map(C),...D.slice(2,2+s.dum[1])]],field:s.f.map(C),deck:{length:s.d},caps:[s.c0.map(C),s.c1.map(C)],
       go:s.go,shake:s.sh,bomb:s.bo,kookAs:s.k,ppeok:{},taking:new Set(),from:new Map(),turn:-1,over:true,busy:true};
     render({still:true}); $('#oppName').textContent=R.opp; $('#oppMoney').textContent=''; if(R.oppAv==null&&R.lv) $('#oppFace').innerHTML=portrait(R.lv,'n'); else if(R.oppAv!=null) $('#oppFace').innerHTML=avatarHTML(R.oppAv,R.opp); setMsg(`${i+1} / ${R.log.length} · ${esc(s.msg)}`);
     $('#rpS').textContent=i===R.log.length-1?`${R.opp}와의 판 · ${R.result||''}`:`${R.opp}와의 판`; };
-  bar.onclick=e=>{ const b=e.target.closest('[data-rp]'); if(!b) return; sfx('ui'); const k=b.dataset.rp;
-    if(k==='close'){ bar.hidden=true; document.body.classList.remove('replaying'); S=null; return home(); }
+  bar.onclick=e=>{ const b=e.target.closest('[data-rp]'); if(!b||bar.hidden||!S||!S.replay) return; sfx('ui'); const k=b.dataset.rp;
+    if(k==='close'){ S=null; return home(); }
     i=k==='first'?0:k==='last'?R.log.length-1:k==='prev'?Math.max(0,i-1):Math.min(R.log.length-1,i+1); draw(); };
   draw();
 }
