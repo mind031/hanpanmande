@@ -567,6 +567,22 @@ function voice(kind){
   if(kind==='tiger'){ const o=voc('sawtooth',88,[[.3,72],[.7,60]],.75,340,.6);
     const l=a.createOscillator(); l.frequency.value=23; const lg=a.createGain(); lg.gain.value=14; l.connect(lg).connect(o.frequency); l.start(t); l.stop(t+.77); }
 }
+/* 폭탄: 파·파·팡! 세 번 내려치고 마지막에 크게 터지기 */
+function boom(){
+  const a=ac(); if(!a||!store.sound) return; const t=a.currentTime;
+  slap(true,0); slap(true,.11);
+  // 마지막 '팡!' : 굵은 짝 + 쿵 + 터지는 잡음
+  [0.22,0.225].forEach(s=>slap(true,s));
+  const o=a.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(160,t+.22); o.frequency.exponentialRampToValueAtTime(38,t+.75);
+  const g=a.createGain(); g.gain.setValueAtTime(.0001,t+.22); g.gain.exponentialRampToValueAtTime(1.3,t+.23); g.gain.exponentialRampToValueAtTime(.001,t+.8);
+  o.connect(g).connect(a.destination); o.start(t+.22); o.stop(t+.82);
+  const n=a.createBufferSource(); n.buffer=noise(a);
+  const lp=a.createBiquadFilter(); lp.type='lowpass'; lp.frequency.setValueAtTime(5000,t+.22); lp.frequency.exponentialRampToValueAtTime(300,t+.7);
+  const ng=a.createGain(); ng.gain.setValueAtTime(.0001,t+.22); ng.gain.exponentialRampToValueAtTime(.9,t+.23); ng.gain.exponentialRampToValueAtTime(.001,t+.7);
+  n.connect(lp).connect(ng).connect(a.destination); n.start(t+.22,Math.random()*.3); n.stop(t+.72);
+  // 반짝이는 불꽃 소리
+  [0.3,0.36,0.43,0.5].forEach((s,i)=>tones([[1800+i*350,s,.07,2600+i*300]],'triangle',.08));
+}
 function sfx(k){
   if(typeof NET!=='undefined'&&NET.role==='host'&&GAME_SFX.has(k)) netSend({type:'sfx',k});
   switch(k){
@@ -581,7 +597,7 @@ function sfx(k){
     case 'jjok': slap(true); return tones([[1100,.02,.12,2200]],'sine',.3);
     case 'ttadak': slap(true); slap(true,.1); return;
     case 'sweep': swish(); slap(true,.12); slap(true,.2); return tones([[400,.0,.4,1600]],'triangle',.2);
-    case 'bomb': slap(true); slap(true,.06); return tones([[120,0,.5,40]],'sine',.6);
+    case 'bomb': return boom();
     case 'shake': [0,.07,.14].forEach(s=>slap(false,s)); return;
     case 'bonus': flipSnd(); return tones([[880,.03,.12],[1320,.12,.18]],'triangle',.22);
     case 'steal': return tones([[700,0,.08],[1050,.07,.1]],'square',.1);
